@@ -1,16 +1,17 @@
-"""Tests for src/hinglishkey/normalize.py (raw + soundex modes)."""
+"""Tests for src/hinglishkey/normalize.py."""
 
 import inspect
 
 import pytest
 
 from hinglishkey import normalize
+from hinglishkey.hkey import hkey
+from hinglishkey.variants import VariantClusters
 from hinglishkey.normalize import (
     MODES,
     fit_variants,
     normalize_tokens,
     soundex,
-    squash_runs,
     tokenize,
 )
 
@@ -25,6 +26,10 @@ def test_signatures_match_contract():
     assert list(inspect.signature(tokenize).parameters) == ["text"]
     assert list(inspect.signature(normalize_tokens).parameters) == ["tokens", "mode"]
     assert list(inspect.signature(fit_variants).parameters) == ["train_texts"]
+
+
+def test_tokenize_uses_the_tokenizer_module():
+    assert tokenize("@ rahul Achhaaaa https // t co / x1 #Jeet") == ["achhaa", "jeet"]
 
 
 # --- Soundex: lecture 2 examples -------------------------------------------
@@ -67,73 +72,6 @@ def test_soundex_non_alpha_token_unchanged():
     assert soundex("") == ""
 
 
-# --- Tokenisation -----------------------------------------------------------
-
-def test_tokenize_lowercases():
-    assert tokenize("Bahut ACCHA") == ["bahut", "accha"]
-
-
-def test_tokenize_strips_urls_and_mentions():
-    text = "@rahul dekho https://t.co/abc123 www.example.com mast"
-    assert tokenize(text) == ["dekho", "mast"]
-
-
-def test_tokenize_strips_pretokenised_url_from_dataset():
-    # SentiMix files split URLs into space-separated pieces.
-    text = "kya match tha https // t . co / hBg7zS0viy bhai"
-    assert tokenize(text) == ["kya", "match", "tha", "bhai"]
-
-
-@pytest.mark.parametrize("url", [
-    "https // t co / hBg7zS0viy",      # no dot between t and co
-    "https // tco / hBg7zS0viy",
-    "https // t . c",                  # tweet truncated mid-URL
-    "https // t",
-    "https",
-])
-def test_tokenize_strips_other_dataset_url_forms(url):
-    assert tokenize(f"dekho {url} yaar") == ["dekho", "yaar"]
-
-
-def test_tokenize_strips_split_mention_from_dataset():
-    assert tokenize("@ rahul_01 sahi bola") == ["sahi", "bola"]
-
-
-def test_tokenize_strips_split_mention_with_underscores():
-    assert tokenize("@ nitin _ gadkari ji sahi") == ["ji", "sahi"]
-    assert tokenize("@ bts _ army _ fin dekho") == ["dekho"]
-
-
-def test_tokenize_url_strip_does_not_eat_following_words():
-    assert tokenize("https://t.co/abc . bahut accha") == ["bahut", "accha"]
-
-
-def test_tokenize_keeps_hashtag_text():
-    assert tokenize("#IndVsPak jeet gaye") == ["indvspak", "jeet", "gaye"]
-
-
-def test_tokenize_drops_emojis_and_punctuation():
-    assert tokenize("kya baat hai!!! \U0001F602\U0001F525") == ["kya", "baat", "hai"]
-
-
-def test_tokenize_squashes_long_letter_runs():
-    assert tokenize("achhaaaa yaaaar") == ["achhaa", "yaar"]
-
-
-def test_tokenize_does_not_squash_digits():
-    assert tokenize("1000 runs") == ["1000", "runs"]
-
-
-def test_tokenize_keeps_apostrophe_words_whole():
-    assert tokenize("don't worry") == ["dont", "worry"]
-
-
-def test_squash_runs_is_separately_ablatable():
-    assert squash_runs("achhaaaa") == "achhaa"
-    assert squash_runs("acha") == "acha"
-    assert normalize._tokenize("achhaaaa", squash=False) == ["achhaaaa"]
-
-
 # --- normalize_tokens -------------------------------------------------------
 
 def test_raw_mode_is_identity_and_copies():
@@ -147,12 +85,27 @@ def test_soundex_mode():
     assert normalize_tokens(["herman", "hermann"], "soundex") == ["H655", "H655"]
 
 
+def test_hkey_mode_uses_default_hkey():
+    toks = ["bahut", "bohot", "2020"]
+    assert normalize_tokens(toks, "hkey") == [hkey(t) for t in toks] == ["bht", "bht", "2020"]
+
+
+def test_hkey_clusters_needs_fit(monkeypatch):
+    monkeypatch.setattr(normalize, "_variants", None)
+    with pytest.raises(RuntimeError):
+        normalize_tokens(["bahut"], "hkey_clusters")
+
+
+def test_hkey_clusters_after_fit(monkeypatch):
+    # Merge behaviour itself is tested in test_variants.py; this checks wiring.
+    monkeypatch.setattr(normalize, "_variants", None)
+    texts = ["bahut accha", "bahut acha", "bahuut badiya", "kal milte"]
+    fit_variants(texts)
+    toks = ["bahuut", "acha", "kal", "2020"]
+    expected = [VariantClusters().fit(texts).canonical(t) for t in toks]
+    assert normalize_tokens(toks, "hkey_clusters") == expected
+
+
 def test_unknown_mode_raises_value_error():
     with pytest.raises(ValueError):
         normalize_tokens(["x"], "stemming")
-
-
-@pytest.mark.parametrize("mode", ["hkey", "hkey_clusters"])
-def test_later_modes_not_yet_implemented(mode):
-    with pytest.raises(NotImplementedError):
-        normalize_tokens(["x"], mode)
