@@ -77,9 +77,14 @@ def test_agrees_with_sklearn_on_sentimix_dev(sentimix_raw, sentimix_raw_tfidf):
 
     X_train, y_train, X_dev, _ = sentimix_raw
     V_train, V_dev = sentimix_raw_tfidf
-    ours = Rocchio().fit(X_train, y_train).predict(X_dev)
+    model = Rocchio().fit(X_train, y_train)
+    ours = model.predict(X_dev)
     theirs = NearestCentroid().fit(V_train, y_train).predict(V_dev).tolist()
 
     agreement = sum(a == b for a, b in zip(ours, theirs)) / len(ours)
-    assert agreement >= 0.99
-    assert agreement == 1.0
+    # On a failure, list each disagreeing dev doc with our centroid distances, so that a
+    # float-level near-tie can be told apart from a real bug (smallest gap on dev is ~6e-6).
+    diffs = {j: (ours[j], theirs[j], model.distances(X_dev[j]))
+             for j in range(len(ours)) if ours[j] != theirs[j]}
+    assert agreement >= 0.99, diffs
+    assert agreement == 1.0, diffs
