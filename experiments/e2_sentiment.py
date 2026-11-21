@@ -269,15 +269,14 @@ def main() -> None:
             "significance": f"paired bootstrap, {N_BOOTSTRAP} resamples of the test set, seed {SEED}; "
                             "delta = macro F1(mode) - macro F1(raw), same classifier; "
                             "p = one-sided fraction of resamples with delta <= 0",
+            "hkey_opts": dict(normalize.HKEY_OPTS),
             "variant_clusters": {"theta": clusters.theta, "key_opts": clusters.key_opts},
+            "hkey_settings_source": "frozen; chosen on the E1 dev groups by strict pairwise F1 "
+                                    "(results/e1_variants.json), before this run",
             "main_metric": "macro F1",
             "comparison_metric": "weighted F1 (support-weighted mean of per-class F1), as in Patwa et al. 2020 Sec. 3.1",
             "python": platform.python_version(),
             "numpy": np.__version__,
-        },
-        "provisional": {
-            "hkey": "default H-Key rules (V-drop); the final vowel policy is chosen on dev in E1",
-            "hkey_clusters": f"theta = {clusters.theta} not yet tuned on dev",
         },
         "results": results,
         "majority_baseline": majority_baseline,
