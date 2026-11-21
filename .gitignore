@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# HinglishKey
+data/raw/*
+!data/raw/.gitkeep
+demo/*.mp4
