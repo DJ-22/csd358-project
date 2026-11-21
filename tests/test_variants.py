@@ -155,3 +155,56 @@ def test_save_load_roundtrip(tmp_path):
     assert m2.theta == 0.3 and m2.key_opts == {"vowels": "norm"}
     assert m2.canon == m.canon
     assert m2.canonical("bahuut") == m.canonical("bahuut")
+
+
+# --- k-means ablation (L14) ------------------------------------------------------
+
+import random as _random
+
+import numpy as np
+
+from hinglishkey import variants as _variants
+from hinglishkey.variants import kmeans, knee
+
+
+def test_kmeans_separates_two_clear_clusters():
+    X = np.array([[0, 0], [0, 0.1], [0.1, 0], [5, 5], [5, 5.1], [5.1, 5]], dtype=float)
+    labels, rss = kmeans(X, 2, _random.Random(42))
+    assert labels[0] == labels[1] == labels[2] != labels[3] == labels[4] == labels[5]
+    assert rss == pytest.approx(4 * 0.1 ** 2 * 2 / 3, rel=1e-6)
+
+
+def test_kmeans_rss_zero_when_k_equals_n():
+    X = np.array([[0.0, 1.0], [1.0, 0.0], [2.0, 2.0]])
+    assert kmeans(X, 3, _random.Random(42))[1] == pytest.approx(0.0)
+
+
+def test_knee_picks_the_elbow():
+    ks = [1, 2, 3, 4, 5, 6]
+    rss = [100, 40, 12, 10, 9, 8.5]
+    assert knee(ks, rss) == 3
+
+
+def test_knee_with_too_few_points():
+    assert knee([1, 2], [5.0, 1.0]) == 1
+
+
+def test_unknown_method_rejected():
+    with pytest.raises(ValueError):
+        VariantClusters(method="dbscan")
+
+
+def test_kmeans_method_used_only_in_large_blocks(monkeypatch):
+    monkeypatch.setattr(_variants, "LARGE_BLOCK", 3)
+    texts = ["bahut bahut bohot bahot bht", "acha accha"]
+    m = VariantClusters(theta=0.0, method="kmeans").fit(texts)
+    # block "bht" (4 words) is split by k-means; every word still gets a class
+    assert set(m.canon) == {"bahut", "bohot", "bahot", "bht", "acha", "accha"}
+    # block "ac" (2 words) is below LARGE_BLOCK, so the theta rule (theta=0) merges it
+    assert m.canonical("acha") == m.canonical("accha")
+
+
+def test_kmeans_method_survives_save_load(tmp_path):
+    m = VariantClusters(theta=0.4, method="kmeans").fit(["acha accha"])
+    m.save(tmp_path / "v.json")
+    assert VariantClusters.load(tmp_path / "v.json").method == "kmeans"

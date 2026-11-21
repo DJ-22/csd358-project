@@ -18,6 +18,10 @@ from hinglishkey.variants import VariantClusters
 
 MODES = ("raw", "soundex", "hkey", "hkey_clusters")
 
+# Vowel policy of mode "hkey", chosen on the E1 dev groups by strict pairwise
+# F1 (V-norm 0.373 vs V-drop 0.218; results/e1_variants.json). Frozen.
+HKEY_OPTS = {"vowels": "norm"}
+
 # Learned by fit_variants(); used by mode "hkey_clusters".
 _variants: VariantClusters | None = None
 
@@ -94,7 +98,7 @@ def normalize_tokens(tokens: list[str], mode: str) -> list[str]:
 
     raw           -> tokens unchanged
     soundex       -> lecture-2 Soundex code of each token
-    hkey          -> H-Key of each token (default rules, see hkey.py)
+    hkey          -> H-Key of each token (HKEY_OPTS: V-norm, see hkey.py)
     hkey_clusters -> canonical spelling of the token's variant class
                      (needs fit_variants() first)
     """
@@ -103,7 +107,7 @@ def normalize_tokens(tokens: list[str], mode: str) -> list[str]:
     if mode == "soundex":
         return [soundex(t) for t in tokens]
     if mode == "hkey":
-        return [hkey(t) for t in tokens]
+        return [hkey(t, **HKEY_OPTS) for t in tokens]
     if mode == "hkey_clusters":
         if _variants is None:
             raise RuntimeError('call fit_variants(train_texts) before mode="hkey_clusters"')
@@ -112,6 +116,9 @@ def normalize_tokens(tokens: list[str], mode: str) -> list[str]:
 
 
 def fit_variants(train_texts: list[str]) -> None:
-    """Learns clusters from TRAIN only; required before mode="hkey_clusters"."""
+    """Learns clusters from TRAIN only; required before mode="hkey_clusters".
+
+    Uses the settings tuned on E1 dev: V-drop key, theta = variants.DEFAULT_THETA.
+    """
     global _variants
     _variants = VariantClusters().fit(train_texts)
