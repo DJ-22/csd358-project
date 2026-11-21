@@ -1,0 +1,48 @@
+{
+  "n_items": 3541,
+  "n_groups": 600,
+  "three_labels": {
+    "observed": 0.9805139791019486,
+    "kappa": 0.960259546091991
+  },
+  "strict_binary": {
+    "observed": 0.9870093194012991,
+    "kappa": 0.9622183646127526
+  },
+  "lenient_binary": {
+    "observed": 0.9830556340016945,
+    "kappa": 0.9616755535993883
+  },
+  "label_counts_a": {
+    "SAME": 789,
+    "INFLECTION": 393,
+    "DIFFERENT": 2359
+  },
+  "label_counts_b": {
+    "SAME": 773,
+    "INFLECTION": 381,
+    "DIFFERENT": 2387
+  },
+  "confusion_a_rows_b_cols": {
+    "SAME": {
+      "SAME": 758,
+      "INFLECTION": 7,
+      "DIFFERENT": 24
+    },
+    "INFLECTION": {
+      "SAME": 2,
+      "INFLECTION": 371,
+      "DIFFERENT": 20
+    },
+    "DIFFERENT": {
+      "SAME": 13,
+      "INFLECTION": 3,
+      "DIFFERENT": 2343
+    }
+  },
+  "n_disagreements": 69,
+  "files": {
+    "a": "data\\gold\\variants_gold_A.tsv",
+    "b": "data\\gold\\variants_gold_B.tsv"
+  }
+}
