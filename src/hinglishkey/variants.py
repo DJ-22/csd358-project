@@ -18,16 +18,29 @@ in exactly one class. The class ID is its most frequent member (the
 canonical spelling); ties go to the alphabetically first member.
 
 Fit on the TRAIN split only. theta is tuned on dev gold groups.
+
+Ablation (method="kmeans"): inside every key block of at least LARGE_BLOCK
+words, the theta rule is replaced by k-means over the same trigram vectors
+(L14), with K chosen at the knee of the RSS curve. Smaller blocks still use
+the theta rule.
 """
 
 import json
 import math
+import random
 from collections import Counter, defaultdict
+
+import numpy as np
 
 from hinglishkey.hkey import hkey
 from hinglishkey.tokenize import tokenize
 
-DEFAULT_THETA = 0.5     # provisional; replaced by the value tuned on dev
+# Chosen on the E1 dev groups by strict pairwise F1 (results/e1_variants.json):
+# V-drop key, theta 0.85. Frozen; used by normalize.fit_variants().
+DEFAULT_THETA = 0.85
+DEFAULT_KEY_OPTS = {"vowels": "drop"}
+LARGE_BLOCK = 10        # k-means ablation: blocks with at least this many words
+KMEANS_SEED = 42
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +113,76 @@ class UnionFind:
 
 
 # ---------------------------------------------------------------------------
+# k-means and the RSS knee (L14 flat clustering), for the ablation
+# ---------------------------------------------------------------------------
+
+def kmeans(X: np.ndarray, k: int, rng: random.Random, n_init: int = 5,
+           max_iter: int = 100) -> tuple[list[int], float]:
+    """k-means (L14): best of n_init runs, each seeded with k random points.
+
+    Each run alternates (1) assign every vector to its nearest centroid and
+    (2) move each centroid to the mean of its vectors, until no assignment
+    changes. RSS = sum of squared distances to the assigned centroids.
+    Returns the labels and RSS of the run with the lowest RSS.
+    """
+    n = len(X)
+    best_labels, best_rss = None, math.inf
+    for _ in range(n_init):
+        centroids = X[rng.sample(range(n), k)].copy()
+        labels = None
+        for _ in range(max_iter):
+            # squared distances, n x k
+            d2 = ((X[:, None, :] - centroids[None, :, :]) ** 2).sum(axis=2)
+            new = d2.argmin(axis=1)
+            if labels is not None and (new == labels).all():
+                break
+            labels = new
+            for c in range(k):
+                members = X[labels == c]
+                if len(members):                       # an empty cluster keeps its centroid
+                    centroids[c] = members.mean(axis=0)
+        rss = float(((X - centroids[labels]) ** 2).sum())
+        if rss < best_rss:
+            best_labels, best_rss = labels.tolist(), rss
+    return best_labels, best_rss
+
+
+def knee(ks: list[int], rss: list[float]) -> int:
+    """K at the knee of the RSS curve (L14 "knee" heuristic).
+
+    Both axes are scaled to [0, 1]; the knee is the K whose point lies
+    furthest below the straight line from the first to the last point.
+    """
+    if len(ks) < 3:
+        return ks[0]
+    x = [(k - ks[0]) / (ks[-1] - ks[0]) for k in ks]
+    span = (rss[0] - rss[-1]) or 1.0
+    y = [(r - rss[-1]) / span for r in rss]
+    # the line runs from (0, 1) to (1, 0): y = 1 - x; distance below it ~ (1 - x) - y
+    gaps = [(1 - xi) - yi for xi, yi in zip(x, y)]
+    return ks[max(range(len(ks)), key=lambda i: (gaps[i], -i))]
+
+
+def kmeans_partition(words: list[str], vectors: dict[str, dict[str, float]],
+                     rng: random.Random) -> list[list[str]]:
+    """Split one key block with k-means, K = knee of RSS over K = 1..len//2."""
+    dims = sorted({g for w in words for g in vectors[w]})
+    col = {g: i for i, g in enumerate(dims)}
+    X = np.zeros((len(words), len(dims)))
+    for i, w in enumerate(words):
+        for g, x in vectors[w].items():
+            X[i, col[g]] = x
+    ks = list(range(1, max(2, len(words) // 2) + 1))
+    runs = [kmeans(X, k, rng) for k in ks]
+    best_k = knee(ks, [rss for _, rss in runs])
+    labels = runs[ks.index(best_k)][0]
+    groups = defaultdict(list)
+    for w, c in zip(words, labels):
+        groups[c].append(w)
+    return list(groups.values())
+
+
+# ---------------------------------------------------------------------------
 # The variant model
 # ---------------------------------------------------------------------------
 
@@ -124,9 +207,13 @@ class VariantClusters:
     key_opts : keyword options passed to hkey() (e.g. {"vowels": "norm"})
     """
 
-    def __init__(self, theta: float = DEFAULT_THETA, key_opts: dict | None = None):
+    def __init__(self, theta: float = DEFAULT_THETA, key_opts: dict | None = None,
+                 method: str = "theta"):
+        if method not in ("theta", "kmeans"):
+            raise ValueError(f"method must be 'theta' or 'kmeans', got {method!r}")
         self.theta = theta
-        self.key_opts = dict(key_opts or {})
+        self.key_opts = dict(DEFAULT_KEY_OPTS if key_opts is None else key_opts)
+        self.method = method
         self.freq: Counter = Counter()
         self.canon: dict[str, str] = {}
 
@@ -139,8 +226,14 @@ class VariantClusters:
 
         words = list(self._vectors)
         uf = UnionFind(words)
+        rng = random.Random(KMEANS_SEED)
         # Blocking: compare only words that share an H-Key.
         for members in self._blocks.values():
+            if self.method == "kmeans" and len(members) >= LARGE_BLOCK:
+                for group in kmeans_partition(members, self._vectors, rng):
+                    for w in group[1:]:
+                        uf.union(group[0], w)
+                continue
             for i in range(len(members)):
                 vi = self._vectors[members[i]]
                 for j in range(i + 1, len(members)):
@@ -203,14 +296,14 @@ class VariantClusters:
 
     def save(self, path) -> None:
         with open(path, "w", encoding="utf-8") as f:
-            json.dump({"theta": self.theta, "key_opts": self.key_opts,
+            json.dump({"theta": self.theta, "key_opts": self.key_opts, "method": self.method,
                        "freq": self.freq, "canon": self.canon}, f, ensure_ascii=False)
 
     @classmethod
     def load(cls, path) -> "VariantClusters":
         with open(path, encoding="utf-8") as f:
             d = json.load(f)
-        model = cls(d["theta"], d["key_opts"])
+        model = cls(d["theta"], d["key_opts"], d.get("method", "theta"))
         model.freq = Counter(d["freq"])
         model.canon = d["canon"]
         model._build_index()
@@ -233,7 +326,7 @@ if __name__ == "__main__":
     classes = model.classes()
     multi = [h for h, m in classes.items() if len(m) > 1]
     sizes = [len(model._blocks[k]) for k in model._blocks]
-    print(f"vowels={vowels} theta={model.theta} (provisional)  fit {secs:.1f}s")
+    print(f"vowels={vowels} theta={model.theta} (tuned on E1 dev)  fit {secs:.1f}s")
     print(f"word types with a key: {len(model.canon)}  key blocks: {len(sizes)}"
           f"  largest block: {max(sizes)}  pairs compared: "
           f"{sum(b * (b - 1) // 2 for b in sizes)}")

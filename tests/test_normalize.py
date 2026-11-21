@@ -85,9 +85,19 @@ def test_soundex_mode():
     assert normalize_tokens(["herman", "hermann"], "soundex") == ["H655", "H655"]
 
 
-def test_hkey_mode_uses_default_hkey():
-    toks = ["bahut", "bohot", "2020"]
-    assert normalize_tokens(toks, "hkey") == [hkey(t) for t in toks] == ["bht", "bht", "2020"]
+def test_hkey_mode_uses_frozen_vnorm_policy():
+    assert normalize.HKEY_OPTS == {"vowels": "norm"}
+    toks = ["theek", "thik", "bahut", "2020"]
+    assert normalize_tokens(toks, "hkey") == [hkey(t, vowels="norm") for t in toks] \
+        == ["tik", "tik", "bahut", "2020"]
+
+
+def test_cluster_defaults_are_the_dev_tuned_ones():
+    from hinglishkey import variants
+    assert variants.DEFAULT_THETA == 0.85
+    assert variants.DEFAULT_KEY_OPTS == {"vowels": "drop"}
+    m = VariantClusters()
+    assert m.theta == 0.85 and m.key_opts == {"vowels": "drop"}
 
 
 def test_hkey_clusters_needs_fit(monkeypatch):

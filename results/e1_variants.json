@@ -1,0 +1,523 @@
+{
+  "question": "Does H-Key group true spelling variants?",
+  "gold": {
+    "file": "data/gold/variants_gold.tsv",
+    "n_groups": 600,
+    "n_rows": 3541,
+    "labels": {
+      "SAME": 776,
+      "INFLECTION": 382,
+      "DIFFERENT": 2383
+    },
+    "annotation": "both annotators and the adjudicator were language models; see data/README.md",
+    "split": {
+      "seed": 42,
+      "dev_groups": 300,
+      "test_groups": 300,
+      "dev_gold_pairs_strict": 755,
+      "dev_gold_pairs_lenient": 1270,
+      "test_gold_pairs_strict": 711,
+      "test_gold_pairs_lenient": 1267
+    }
+  },
+  "metric": "pairwise precision/recall/F1 over the gold words of one split (metrics.pairwise_prf); strict = only SAME pairs are true variants, lenient = SAME or INFLECTION",
+  "tuning_on_dev": {
+    "criterion": "strict F1 (ties: V-drop for plain H-Key; larger theta for clusters)",
+    "hkey_vowel_policy": "norm",
+    "clusters": {
+      "vowels": "drop",
+      "theta": 0.85
+    },
+    "kmeans_ablation": {
+      "vowels": "drop",
+      "theta_small_blocks": 0.85,
+      "large_block_min_words": 10,
+      "k": "knee of RSS, K = 1..block/2"
+    },
+    "theta_grid": [
+      0.2,
+      0.25,
+      0.3,
+      0.35,
+      0.4,
+      0.45,
+      0.5,
+      0.55,
+      0.6,
+      0.65,
+      0.7,
+      0.75,
+      0.8,
+      0.85,
+      0.9
+    ],
+    "grid": {
+      "drop": [
+        {
+          "theta": 0.2,
+          "precision": 0.1605239110569601,
+          "recall": 0.6980132450331126,
+          "f1": 0.26102030708271423,
+          "lenient_f1": 0.35844498133099056
+        },
+        {
+          "theta": 0.25,
+          "precision": 0.17804363124560169,
+          "recall": 0.6701986754966888,
+          "f1": 0.2813455657492355,
+          "lenient_f1": 0.3837548638132296
+        },
+        {
+          "theta": 0.3,
+          "precision": 0.2097872340425532,
+          "recall": 0.6529801324503312,
+          "f1": 0.3175523349436393,
+          "lenient_f1": 0.4259668508287293
+        },
+        {
+          "theta": 0.35,
+          "precision": 0.23244062657908035,
+          "recall": 0.609271523178808,
+          "f1": 0.3365032918800293,
+          "lenient_f1": 0.44813788858110193
+        },
+        {
+          "theta": 0.4,
+          "precision": 0.23367512142471666,
+          "recall": 0.5735099337748344,
+          "f1": 0.33205521472392635,
+          "lenient_f1": 0.44316362471982074
+        },
+        {
+          "theta": 0.45,
+          "precision": 0.23353658536585367,
+          "recall": 0.5072847682119205,
+          "f1": 0.3198329853862213,
+          "lenient_f1": 0.43092783505154636
+        },
+        {
+          "theta": 0.5,
+          "precision": 0.2485250737463127,
+          "recall": 0.4463576158940397,
+          "f1": 0.3192799621032686,
+          "lenient_f1": 0.4188880426504189
+        },
+        {
+          "theta": 0.55,
+          "precision": 0.28425925925925927,
+          "recall": 0.4066225165562914,
+          "f1": 0.3346049046321526,
+          "lenient_f1": 0.38978723404255317
+        },
+        {
+          "theta": 0.6,
+          "precision": 0.3443627450980392,
+          "recall": 0.37218543046357616,
+          "f1": 0.3577339274347549,
+          "lenient_f1": 0.35570469798657717
+        },
+        {
+          "theta": 0.65,
+          "precision": 0.4104938271604938,
+          "recall": 0.352317880794702,
+          "f1": 0.3791874554526016,
+          "lenient_f1": 0.3201251303441084
+        },
+        {
+          "theta": 0.7,
+          "precision": 0.4271186440677966,
+          "recall": 0.3337748344370861,
+          "f1": 0.37472118959107814,
+          "lenient_f1": 0.3053763440860215
+        },
+        {
+          "theta": 0.75,
+          "precision": 0.4412811387900356,
+          "recall": 0.32847682119205296,
+          "f1": 0.3766135155656796,
+          "lenient_f1": 0.28820960698689957
+        },
+        {
+          "theta": 0.8,
+          "precision": 0.45935727788279773,
+          "recall": 0.3218543046357616,
+          "f1": 0.3785046728971963,
+          "lenient_f1": 0.2768204558087827
+        },
+        {
+          "theta": 0.85,
+          "precision": 0.48282828282828283,
+          "recall": 0.3165562913907285,
+          "f1": 0.3824,
+          "lenient_f1": 0.2753541076487252
+        },
+        {
+          "theta": 0.9,
+          "precision": 0.4854771784232365,
+          "recall": 0.30993377483443707,
+          "f1": 0.3783346806790622,
+          "lenient_f1": 0.271689497716895
+        }
+      ],
+      "norm": [
+        {
+          "theta": 0.2,
+          "precision": 0.47925311203319504,
+          "recall": 0.30596026490066225,
+          "f1": 0.3734842360549717,
+          "lenient_f1": 0.2682648401826484
+        },
+        {
+          "theta": 0.25,
+          "precision": 0.47925311203319504,
+          "recall": 0.30596026490066225,
+          "f1": 0.3734842360549717,
+          "lenient_f1": 0.2682648401826484
+        },
+        {
+          "theta": 0.3,
+          "precision": 0.47925311203319504,
+          "recall": 0.30596026490066225,
+          "f1": 0.3734842360549717,
+          "lenient_f1": 0.2682648401826484
+        },
+        {
+          "theta": 0.35,
+          "precision": 0.47925311203319504,
+          "recall": 0.30596026490066225,
+          "f1": 0.3734842360549717,
+          "lenient_f1": 0.2682648401826484
+        },
+        {
+          "theta": 0.4,
+          "precision": 0.47925311203319504,
+          "recall": 0.30596026490066225,
+          "f1": 0.3734842360549717,
+          "lenient_f1": 0.2682648401826484
+        },
+        {
+          "theta": 0.45,
+          "precision": 0.47925311203319504,
+          "recall": 0.30596026490066225,
+          "f1": 0.3734842360549717,
+          "lenient_f1": 0.2682648401826484
+        },
+        {
+          "theta": 0.5,
+          "precision": 0.47925311203319504,
+          "recall": 0.30596026490066225,
+          "f1": 0.3734842360549717,
+          "lenient_f1": 0.2682648401826484
+        },
+        {
+          "theta": 0.55,
+          "precision": 0.47925311203319504,
+          "recall": 0.30596026490066225,
+          "f1": 0.3734842360549717,
+          "lenient_f1": 0.2682648401826484
+        },
+        {
+          "theta": 0.6,
+          "precision": 0.47925311203319504,
+          "recall": 0.30596026490066225,
+          "f1": 0.3734842360549717,
+          "lenient_f1": 0.2682648401826484
+        },
+        {
+          "theta": 0.65,
+          "precision": 0.47925311203319504,
+          "recall": 0.30596026490066225,
+          "f1": 0.3734842360549717,
+          "lenient_f1": 0.2682648401826484
+        },
+        {
+          "theta": 0.7,
+          "precision": 0.47925311203319504,
+          "recall": 0.30596026490066225,
+          "f1": 0.3734842360549717,
+          "lenient_f1": 0.2682648401826484
+        },
+        {
+          "theta": 0.75,
+          "precision": 0.47925311203319504,
+          "recall": 0.30596026490066225,
+          "f1": 0.3734842360549717,
+          "lenient_f1": 0.2682648401826484
+        },
+        {
+          "theta": 0.8,
+          "precision": 0.47925311203319504,
+          "recall": 0.30596026490066225,
+          "f1": 0.3734842360549717,
+          "lenient_f1": 0.2682648401826484
+        },
+        {
+          "theta": 0.85,
+          "precision": 0.47925311203319504,
+          "recall": 0.30596026490066225,
+          "f1": 0.3734842360549717,
+          "lenient_f1": 0.2682648401826484
+        },
+        {
+          "theta": 0.9,
+          "precision": 0.47925311203319504,
+          "recall": 0.30596026490066225,
+          "f1": 0.3734842360549717,
+          "lenient_f1": 0.2682648401826484
+        }
+      ]
+    },
+    "note_vnorm": "with the V-norm key, all words in a block share one similarity form, so every cosine is 1 and theta has no effect: clusters on a V-norm key equal plain V-norm H-Key"
+  },
+  "dev": {
+    "exact": {
+      "strict": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "tp": 0,
+        "n_pred_pairs": 0,
+        "n_gold_pairs": 755,
+        "fp_across_groups": 0,
+        "fp_within_groups": 0
+      },
+      "lenient": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "tp": 0,
+        "n_pred_pairs": 0,
+        "n_gold_pairs": 1270
+      }
+    },
+    "soundex": {
+      "strict": {
+        "precision": 0.06036536934074663,
+        "recall": 0.8052980132450331,
+        "f1": 0.11231181305994274,
+        "tp": 608,
+        "n_pred_pairs": 10072,
+        "n_gold_pairs": 755,
+        "fp_across_groups": 7688,
+        "fp_within_groups": 1776
+      },
+      "lenient": {
+        "precision": 0.0960087370929309,
+        "recall": 0.7614173228346457,
+        "f1": 0.1705166637277376,
+        "tp": 967,
+        "n_pred_pairs": 10072,
+        "n_gold_pairs": 1270
+      }
+    },
+    "hkey_vdrop": {
+      "strict": {
+        "precision": 0.12866333095067906,
+        "recall": 0.7152317880794702,
+        "f1": 0.21809369951534732,
+        "tp": 540,
+        "n_pred_pairs": 4197,
+        "n_gold_pairs": 755,
+        "fp_across_groups": 2531,
+        "fp_within_groups": 1126
+      },
+      "lenient": {
+        "precision": 0.19799857040743388,
+        "recall": 0.6543307086614173,
+        "f1": 0.30400585330162794,
+        "tp": 831,
+        "n_pred_pairs": 4197,
+        "n_gold_pairs": 1270
+      }
+    },
+    "hkey_vnorm": {
+      "strict": {
+        "precision": 0.47925311203319504,
+        "recall": 0.30596026490066225,
+        "f1": 0.3734842360549717,
+        "tp": 231,
+        "n_pred_pairs": 482,
+        "n_gold_pairs": 755,
+        "fp_across_groups": 111,
+        "fp_within_groups": 140
+      },
+      "lenient": {
+        "precision": 0.487551867219917,
+        "recall": 0.18503937007874016,
+        "f1": 0.2682648401826484,
+        "tp": 235,
+        "n_pred_pairs": 482,
+        "n_gold_pairs": 1270
+      }
+    },
+    "hkey_clusters": {
+      "strict": {
+        "precision": 0.48282828282828283,
+        "recall": 0.3165562913907285,
+        "f1": 0.3824,
+        "tp": 239,
+        "n_pred_pairs": 495,
+        "n_gold_pairs": 755,
+        "fp_across_groups": 111,
+        "fp_within_groups": 145
+      },
+      "lenient": {
+        "precision": 0.4909090909090909,
+        "recall": 0.19133858267716536,
+        "f1": 0.2753541076487252,
+        "tp": 243,
+        "n_pred_pairs": 495,
+        "n_gold_pairs": 1270
+      }
+    },
+    "hkey_kmeans_ablation": {
+      "strict": {
+        "precision": 0.2648888888888889,
+        "recall": 0.39470198675496687,
+        "f1": 0.3170212765957447,
+        "tp": 298,
+        "n_pred_pairs": 1125,
+        "n_gold_pairs": 755,
+        "fp_across_groups": 347,
+        "fp_within_groups": 480
+      },
+      "lenient": {
+        "precision": 0.3893333333333333,
+        "recall": 0.34488188976377954,
+        "f1": 0.36576200417536536,
+        "tp": 438,
+        "n_pred_pairs": 1125,
+        "n_gold_pairs": 1270
+      }
+    }
+  },
+  "test": {
+    "exact": {
+      "strict": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "tp": 0,
+        "n_pred_pairs": 0,
+        "n_gold_pairs": 711,
+        "fp_across_groups": 0,
+        "fp_within_groups": 0
+      },
+      "lenient": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "tp": 0,
+        "n_pred_pairs": 0,
+        "n_gold_pairs": 1267
+      }
+    },
+    "soundex": {
+      "strict": {
+        "precision": 0.05992193269332208,
+        "recall": 0.7988748241912799,
+        "f1": 0.1114818449460255,
+        "tp": 568,
+        "n_pred_pairs": 9479,
+        "n_gold_pairs": 711,
+        "fp_across_groups": 7000,
+        "fp_within_groups": 1911
+      },
+      "lenient": {
+        "precision": 0.0995885641945353,
+        "recall": 0.745067087608524,
+        "f1": 0.1756932812209194,
+        "tp": 944,
+        "n_pred_pairs": 9479,
+        "n_gold_pairs": 1267
+      }
+    },
+    "hkey_vdrop": {
+      "strict": {
+        "precision": 0.12030444389884606,
+        "recall": 0.6891701828410689,
+        "f1": 0.2048494983277592,
+        "tp": 490,
+        "n_pred_pairs": 4073,
+        "n_gold_pairs": 711,
+        "fp_across_groups": 2401,
+        "fp_within_groups": 1182
+      },
+      "lenient": {
+        "precision": 0.18782224404615763,
+        "recall": 0.6037884767166535,
+        "f1": 0.2865168539325843,
+        "tp": 765,
+        "n_pred_pairs": 4073,
+        "n_gold_pairs": 1267
+      }
+    },
+    "hkey_vnorm": {
+      "strict": {
+        "precision": 0.452431289640592,
+        "recall": 0.3009845288326301,
+        "f1": 0.3614864864864865,
+        "tp": 214,
+        "n_pred_pairs": 473,
+        "n_gold_pairs": 711,
+        "fp_across_groups": 129,
+        "fp_within_groups": 130
+      },
+      "lenient": {
+        "precision": 0.4630021141649049,
+        "recall": 0.1728492501973165,
+        "f1": 0.2517241379310345,
+        "tp": 219,
+        "n_pred_pairs": 473,
+        "n_gold_pairs": 1267
+      }
+    },
+    "hkey_clusters": {
+      "strict": {
+        "precision": 0.4588744588744589,
+        "recall": 0.2981715893108298,
+        "f1": 0.3614663256606991,
+        "tp": 212,
+        "n_pred_pairs": 462,
+        "n_gold_pairs": 711,
+        "fp_across_groups": 123,
+        "fp_within_groups": 127
+      },
+      "lenient": {
+        "precision": 0.4696969696969697,
+        "recall": 0.1712707182320442,
+        "f1": 0.2510121457489879,
+        "tp": 217,
+        "n_pred_pairs": 462,
+        "n_gold_pairs": 1267
+      }
+    },
+    "hkey_kmeans_ablation": {
+      "strict": {
+        "precision": 0.223421926910299,
+        "recall": 0.37834036568213786,
+        "f1": 0.2809399477806789,
+        "tp": 269,
+        "n_pred_pairs": 1204,
+        "n_gold_pairs": 711,
+        "fp_across_groups": 429,
+        "fp_within_groups": 506
+      },
+      "lenient": {
+        "precision": 0.3430232558139535,
+        "recall": 0.3259668508287293,
+        "f1": 0.3342776203966006,
+        "tp": 413,
+        "n_pred_pairs": 1204,
+        "n_gold_pairs": 1267
+      }
+    }
+  },
+  "not_run": {
+    "soundexhindi": "not reproduced (needs the paper's full rule set; not attempted)",
+    "dhvani": "optional dependency, not installed (needs approval)"
+  },
+  "fit_on": "train split only",
+  "code_commit": "a9f0bce7534162085fd0d82cae165bf8982097bd",
+  "seconds": 46.9
+}
