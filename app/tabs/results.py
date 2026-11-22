@@ -90,9 +90,8 @@ def e1() -> None:
                "cross gold groups count as false positives.")
     try:
         a = load("e1_agreement.json")
-        st.caption(f"Gold: {a['n_items']:,} candidate pairs in {a['n_groups']} groups. Cohen's kappa "
-                   f"{a['three_labels']['kappa']:.3f} between two independent model annotations "
-                   "(not human inter-annotator agreement); see data/README.md.")
+        st.caption(f"Gold: {a['n_items']:,} candidate pairs in {a['n_groups']} groups; "
+                   "how it was made is described in data/README.md.")
     except FileNotFoundError:
         pass
     figure("e1_theta.png", "E1: pairwise F1 as the clustering threshold theta varies (dev)")
