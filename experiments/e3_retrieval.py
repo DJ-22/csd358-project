@@ -183,7 +183,67 @@ def plot(results: dict, path: Path) -> None:
     plt.close(fig)
 
 
+BOOTSTRAP_JSON = ROOT / "results" / "e3_bootstrap.json"
+VS_RAW = ("soundex", "hkey", "hkey_clusters", "hkey_vdrop")          # one-sided: mode > raw
+PAIRS = (("hkey", "soundex"), ("hkey_vdrop", "hkey"), ("hkey_clusters", "hkey"))   # two-sided
+N_RESAMPLES = 1000
+
+
+def bootstrap() -> dict:
+    """Paired bootstrap of the MRR difference over the E3 queries (same method as E2).
+
+    Reads the per-query ranks saved by run(), so no retrieval is repeated and no
+    E3 number changes. 1,000 resamples of the queries with replacement
+    (numpy default_rng(42)), the same resamples for every comparison.
+    vs raw: one-sided p = share of resamples with delta <= 0.
+    Between normalised indexes: two-sided p = 2 * min(share <= 0, share >= 0), capped at 1.
+    """
+    import numpy as np
+
+    with open(RESULTS_JSON, encoding="utf-8") as f:
+        rep = json.load(f)
+    rr = {m: np.array([1.0 / q["rank"] if q["rank"] else 0.0 for q in rep["per_query"][m]])
+          for m in SYSTEMS}
+    ids = {m: [q["tweet_id"] for q in rep["per_query"][m]] for m in SYSTEMS}
+    assert all(ids[m] == ids["raw"] for m in SYSTEMS), "queries must be paired"
+    n = len(rr["raw"])
+    samples = np.random.default_rng(42).integers(0, n, size=(N_RESAMPLES, n))
+
+    def compare(a: str, b: str, two_sided: bool) -> dict:
+        diff = rr[a] - rr[b]
+        boot = diff[samples].mean(axis=1)
+        le0, ge0 = float((boot <= 0).mean()), float((boot >= 0).mean())
+        return {"a": a, "b": b, "delta_mrr": float(diff.mean()),
+                "ci95": [float(np.percentile(boot, 2.5)), float(np.percentile(boot, 97.5))],
+                "p": min(1.0, 2 * min(le0, ge0)) if two_sided else le0,
+                "sided": "two" if two_sided else "one (H1: a > b)"}
+
+    out = {
+        "method": f"paired bootstrap over {n} queries, {N_RESAMPLES} resamples with replacement, "
+                  "numpy default_rng(42), same resamples for every comparison; statistic = MRR(a) - MRR(b)",
+        "n_queries": n, "n_resamples": N_RESAMPLES, "seed": 42, "ci_percent": 95,
+        "p_resolution": 1 / N_RESAMPLES,
+        "multiple_comparisons": {"uncorrected": True, "n_tests": len(VS_RAW) + len(PAIRS),
+                                 "bonferroni_alpha_all": 0.05 / (len(VS_RAW) + len(PAIRS)),
+                                 "bonferroni_alpha_vs_raw": 0.05 / len(VS_RAW)},
+        "pre_registered": "comparisons fixed before computing (see project notes)",
+        "vs_raw": [compare(m, "raw", two_sided=False) for m in VS_RAW],
+        "pairs": [compare(a, b, two_sided=True) for a, b in PAIRS],
+        "source": "results/e3_retrieval.json per_query ranks",
+    }
+    with open(BOOTSTRAP_JSON, "w", encoding="utf-8") as f:
+        json.dump(out, f, indent=2)
+    return out
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "bootstrap":
+        out = bootstrap()
+        for c in out["vs_raw"] + out["pairs"]:
+            print(f"{c['a']:14s} - {c['b']:8s} dMRR {c['delta_mrr']:+.3f}  95% CI "
+                  f"[{c['ci95'][0]:+.3f}, {c['ci95'][1]:+.3f}]  p {c['p']:.3f} ({c['sided']})")
+        print(f"wrote {BOOTSTRAP_JSON}")
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "plot":
         with open(RESULTS_JSON, encoding="utf-8") as f:
             plot(json.load(f)["results"], FIGURE)
