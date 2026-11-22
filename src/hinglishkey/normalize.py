@@ -18,6 +18,10 @@ from hinglishkey.variants import VariantClusters
 
 MODES = ("raw", "soundex", "hkey", "hkey_clusters")
 
+# Extra modes for ablations only (not part of MODES). "hkey_vdrop" is H-Key
+# with the V-drop vowel rule: higher recall, lower precision than "hkey" (E1).
+ABLATION_MODES = ("hkey_vdrop",)
+
 # Vowel policy of mode "hkey", chosen on the E1 dev groups by strict pairwise
 # F1 (V-norm 0.373 vs V-drop 0.218; results/e1_variants.json). Frozen.
 HKEY_OPTS = {"vowels": "norm"}
@@ -101,6 +105,7 @@ def normalize_tokens(tokens: list[str], mode: str) -> list[str]:
     hkey          -> H-Key of each token (HKEY_OPTS: V-norm, see hkey.py)
     hkey_clusters -> canonical spelling of the token's variant class
                      (needs fit_variants() first)
+    hkey_vdrop    -> H-Key with V-drop (ablation mode, see ABLATION_MODES)
     """
     if mode == "raw":
         return list(tokens)
@@ -112,7 +117,9 @@ def normalize_tokens(tokens: list[str], mode: str) -> list[str]:
         if _variants is None:
             raise RuntimeError('call fit_variants(train_texts) before mode="hkey_clusters"')
         return [_variants.canonical(t) for t in tokens]
-    raise ValueError(f"unknown mode {mode!r}; expected one of {MODES}")
+    if mode == "hkey_vdrop":
+        return [hkey(t, vowels="drop") for t in tokens]
+    raise ValueError(f"unknown mode {mode!r}; expected one of {MODES + ABLATION_MODES}")
 
 
 def fit_variants(train_texts: list[str]) -> None:

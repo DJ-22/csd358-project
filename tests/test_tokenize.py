@@ -78,3 +78,20 @@ def test_squash_is_separately_ablatable():
     assert squash_runs("achhaaaa") == "achhaa"
     assert squash_runs("acha") == "acha"
     assert tokenize("achhaaaa", squash=False) == ["achhaaaa"]
+
+
+# --- Alignment of display words to token positions ---------------------------
+
+from hinglishkey.tokenize import align_tokens
+
+
+def test_align_tokens_maps_words_to_positions():
+    text = "@ rahul Bahut accha!!! https // t co / x1 yaar"
+    assert tokenize(text) == ["bahut", "accha", "yaar"]
+    assert align_tokens(text) == [("@", []), ("rahul", []), ("Bahut", [0]), ("accha!!!", [1]),
+                                  ("https", []), ("//", []), ("t", []), ("co", []), ("/", []),
+                                  ("x1", []), ("yaar", [2])]
+
+
+def test_align_tokens_word_with_two_tokens():
+    assert align_tokens("match-fixing hai") == [("match-fixing", [0, 1]), ("hai", [2])]
