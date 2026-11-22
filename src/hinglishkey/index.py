@@ -182,3 +182,90 @@ def positional_intersect(p1, p2, offset: int):
         else:
             j += 1
     return answer
+
+
+# ---------------------------------------------------------------------------
+# Precomputed artifacts for the demo (python -m hinglishkey.index)
+# ---------------------------------------------------------------------------
+
+ARTIFACT_MODES = ("raw", "soundex", "hkey", "hkey_clusters", "hkey_vdrop")
+
+
+def build_artifacts(out_dir) -> dict:
+    """Index all 20,000 tweets under every mode and save them with the variant model.
+
+    Writes index_<mode>.pkl for each mode in ARTIFACT_MODES and
+    variants_hkey_clusters.json (fitted on TRAIN only) into out_dir.
+    """
+    import time
+    from pathlib import Path
+
+    from hinglishkey import data, normalize
+
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    splits = {s: data.load_split(s) for s in ("train", "dev", "test")}
+    normalize.fit_variants([text for _, text, _ in splits["train"]])
+    normalize._variants.save(out / "variants_hkey_clusters.json")
+    docs = [(tid, text) for s in ("train", "dev", "test") for tid, text, _ in splits[s]]
+    sizes = {}
+    for mode in ARTIFACT_MODES:
+        t0 = time.perf_counter()
+        idx = build_index(docs, mode)
+        idx.save(out / f"index_{mode}.pkl")
+        sizes[mode] = (idx.n_docs, len(idx.postings), round(time.perf_counter() - t0, 1))
+    return sizes
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+
+    target = Path(__file__).resolve().parents[2] / "artifacts"
+    for mode, (n, v, s) in build_artifacts(target).items():
+        print(f"index_{mode}.pkl: {n} docs, {v} terms ({s} s)")
+    print(f"wrote {target}")
+
+
+class DemoData:
+    """Everything the demo tabs need, loaded once per process (see load_demo)."""
+
+    def __init__(self, indexes, rankers, variants, texts, labels, splits, train_freq):
+        self.indexes = indexes          # mode -> PositionalIndex
+        self.rankers = rankers          # mode -> Ranker
+        self.variants = variants        # fitted VariantClusters (train only)
+        self.texts = texts              # tweet_id -> text
+        self.labels = labels            # tweet_id -> sentiment label
+        self.splits = splits            # tweet_id -> "train" / "dev" / "test"
+        self.train_freq = train_freq    # token -> frequency in the train split
+
+
+_demo_cache: dict = {}
+
+
+def load_demo(artifacts_dir) -> DemoData:
+    """Load the saved indexes and variant model (built by python -m hinglishkey.index).
+
+    Cached per directory, so every tab and every rerun shares one copy.
+    Raises FileNotFoundError if an artifact is missing.
+    """
+    from pathlib import Path
+
+    from hinglishkey import data, normalize
+    from hinglishkey.rank import Ranker
+    from hinglishkey.variants import VariantClusters
+
+    key = str(Path(artifacts_dir).resolve())
+    if key in _demo_cache:
+        return _demo_cache[key]
+    folder = Path(artifacts_dir)
+    variants = VariantClusters.load(folder / "variants_hkey_clusters.json")
+    normalize._variants = variants          # mode "hkey_clusters" maps query words with it
+    indexes = {m: PositionalIndex.load(folder / f"index_{m}.pkl") for m in ARTIFACT_MODES}
+    rankers = {m: Ranker(idx) for m, idx in indexes.items()}
+    texts, labels, splits = {}, {}, {}
+    for s in ("train", "dev", "test"):
+        for tid, text, label in data.load_split(s):
+            texts[tid], labels[tid], splits[tid] = text, label, s
+    demo = DemoData(indexes, rankers, variants, texts, labels, splits, variants.freq)
+    _demo_cache[key] = demo
+    return demo

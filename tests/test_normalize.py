@@ -92,6 +92,14 @@ def test_hkey_mode_uses_frozen_vnorm_policy():
         == ["tik", "tik", "bahut", "2020"]
 
 
+def test_ablation_mode_hkey_vdrop():
+    assert normalize.ABLATION_MODES == ("hkey_vdrop",)
+    assert "hkey_vdrop" not in MODES                      # the frozen tuple is unchanged
+    toks = ["bahut", "bohot", "nahi", "nhi", "2020"]
+    assert normalize_tokens(toks, "hkey_vdrop") == [hkey(t, vowels="drop") for t in toks] \
+        == ["bht", "bht", "nh", "nh", "2020"]
+
+
 def test_cluster_defaults_are_the_dev_tuned_ones():
     from hinglishkey import variants
     assert variants.DEFAULT_THETA == 0.85

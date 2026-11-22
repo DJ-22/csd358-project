@@ -77,3 +77,22 @@ def tokenize(text: str, squash: bool = True) -> list[str]:
     if squash:
         tokens = [squash_runs(t) for t in tokens]
     return tokens
+
+
+def align_tokens(text: str, squash: bool = True) -> list[tuple[str, list[int]]]:
+    """Pair each space-separated word of `text` with its token positions.
+
+    Positions index into tokenize(text). Words removed as part of a URL or
+    mention (or with no letters/digits) get no positions. Used to highlight
+    matched words in the demo.
+    """
+    tokens = tokenize(text, squash)
+    out, i = [], 0
+    for word in text.split():
+        sub = tokenize(word, squash)
+        if sub and tokens[i:i + len(sub)] == sub:
+            out.append((word, list(range(i, i + len(sub)))))
+            i += len(sub)
+        else:
+            out.append((word, []))
+    return out
