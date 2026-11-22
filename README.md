@@ -20,12 +20,12 @@ The SentiMix Hinglish data (SemEval-2020 Task 9, CC BY 4.0) is not committed. To
 
 Each command writes its numbers to `results/` and its figures to `figures/`. Run them from the repo root.
 
-| Experiment | Command | Output |
-|---|---|---|
-| E1 variant grouping | `python experiments/e1_variants.py run` | `results/e1_variants.json`, `figures/e1_theta.png` |
-| E2 sentiment classification | `python experiments/e2_sentiment.py` | `results/e2_sentiment.json`, `figures/e2_f1_bar.png`, `figures/e2_confusion.png` |
-| E3 known-item retrieval | `python experiments/e3_retrieval.py` then `python experiments/e3_retrieval.py bootstrap` | `results/e3_retrieval.json`, `results/e3_bootstrap.json`, `figures/e3_recall_at_k.png` |
-| E4 efficiency | `python experiments/e4_efficiency.py` | `results/e4_efficiency.json`, `figures/e4_vocab_growth.png` |
+| Experiment                  | Command                                                                                      | Output                                                                                       |
+| --------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| E1 variant grouping         | `python experiments/e1_variants.py run`                                                    | `results/e1_variants.json`, `figures/e1_theta.png`                                       |
+| E2 sentiment classification | `python experiments/e2_sentiment.py`                                                       | `results/e2_sentiment.json`, `figures/e2_f1_bar.png`, `figures/e2_confusion.png`       |
+| E3 known-item retrieval     | `python experiments/e3_retrieval.py` then `python experiments/e3_retrieval.py bootstrap` | `results/e3_retrieval.json`, `results/e3_bootstrap.json`, `figures/e3_recall_at_k.png` |
+| E4 efficiency               | `python experiments/e4_efficiency.py`                                                      | `results/e4_efficiency.json`, `figures/e4_vocab_growth.png`                              |
 
 How the gold files in `data/gold/` were made, and their provenance, is described in [`data/README.md`](data/README.md).
 
@@ -40,7 +40,6 @@ The demo is a Streamlit web app. It runs offline on a laptop CPU, with these tab
    python -m hinglishkey.index            # search indexes for every mode + the variant model
    python -m hinglishkey.classify.demo    # sentiment models (NB, Rocchio, kNN for every mode)
    ```
-
 2. Start the app:
 
    ```powershell
@@ -50,20 +49,6 @@ The demo is a Streamlit web app. It runs offline on a laptop CPU, with these tab
    The first start loads everything (about 5 s). After that, each interaction takes well under 300 ms. If the artifacts are missing, the app says so and shows the commands above; it never shows a traceback.
 
 Rebuild the artifacts after re-running E2 (the kNN k comes from `results/e2_sentiment.json`) or after any change to the normalisation code.
-
-## Fallback recording plan
-
-The live demo is the deliverable. A screen recording is kept in case the live run fails, e.g. a projector or laptop problem.
-
-- **What:** one take of about 3 minutes, at 1366×768, following the demo script below. Record it after a fresh `streamlit run`, so the first load is not in the video.
-- **Script:**
-  1. Search: *bohot acha laga* with the raw index shown side by side.
-  2. Phrase search: *bahut accha* under V-norm and under the V-drop ablation.
-  3. Sentiment: an example tweet with Naive Bayes per-token evidence, then switch to Rocchio and kNN.
-  4. Variant explorer: *bahut*.
-  5. Results: E1 to E4 headline tables.
-- **Where:** `demo/fallback.mp4` on the presenting laptop, plus a copy on a USB stick and in a shared drive. Video files are not committed (`demo/*.mp4` is git-ignored).
-- **When:** record again after any change to the app or the results, and check it plays on the presenting laptop the day before.
 
 ## Tests
 
