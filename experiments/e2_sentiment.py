@@ -1,6 +1,8 @@
 """E2: does spelling normalisation improve sentiment classification?
 
-    {NB, Rocchio, kNN} x {raw, soundex, hkey, hkey_clusters} on SentiMix Hinglish.
+    {NB, Rocchio, kNN} x {raw, soundex, hkey, hkey_clusters} on SentiMix Hinglish,
+    plus the ablation mode hkey_vdrop (H-Key with V-drop). The ablation was agreed after the
+    H-Key settings were frozen and is never used to choose them.
 
 Protocol
 - Train on the official train split only (including the variant clusters for hkey_clusters).
@@ -53,7 +55,9 @@ K_GRID = K_VALUES + (21, 31, 45, 61)     # L13 slide values, extended because 15
 N_BOOTSTRAP = 1000
 CLASSIFIERS = ("nb", "rocchio", "knn")
 CLASSIFIER_NAMES = {"nb": "Naive Bayes", "rocchio": "Rocchio", "knn": "kNN"}
-MODE_COLOURS = {"raw": "#2a78d6", "soundex": "#eb6834", "hkey": "#1baf7a", "hkey_clusters": "#eda100"}
+RUN_MODES = normalize.MODES + normalize.ABLATION_MODES      # main modes first, then ablations
+MODE_COLOURS = {"raw": "#2a78d6", "soundex": "#eb6834", "hkey": "#1baf7a", "hkey_clusters": "#eda100",
+                "hkey_vdrop": "#e87ba4"}                     # same colour per mode as E3 and E4
 
 # Published SemEval-2020 Task 9 Hinglish results, weighted F1 (%) on the official test set.
 # Source: Patwa et al. (2020), Table 3 (systems ranked by "Weighted Average F1").
@@ -160,14 +164,16 @@ def run_mode(mode: str, texts: dict, labels: dict) -> dict:
 
 
 def plot_f1_bars(results: dict, path: Path) -> None:
-    modes = normalize.MODES
-    fig, ax = plt.subplots(figsize=(7.5, 4.0))
-    width = 0.2
+    modes = RUN_MODES
+    fig, ax = plt.subplots(figsize=(8.5, 4.2))
+    width = 0.16
     x = np.arange(len(CLASSIFIERS))
     for i, mode in enumerate(modes):
         values = [100 * results[mode][c]["test"]["macro"]["f1"] for c in CLASSIFIERS]
-        bars = ax.bar(x + (i - 1.5) * width, values, width * 0.9, label=mode, color=MODE_COLOURS[mode],
-                      edgecolor="#fcfcfb", linewidth=1)
+        ablation = mode in normalize.ABLATION_MODES
+        bars = ax.bar(x + (i - (len(modes) - 1) / 2) * width, values, width * 0.9,
+                      label=f"{mode} (ablation)" if ablation else mode, color=MODE_COLOURS[mode],
+                      edgecolor="#fcfcfb", linewidth=1, hatch="///" if ablation else None)
         for b, v in zip(bars, values):
             ax.text(b.get_x() + b.get_width() / 2, v + 0.6, f"{v:.1f}", ha="center", va="bottom",
                     fontsize=7, color="#52514e")
@@ -182,15 +188,15 @@ def plot_f1_bars(results: dict, path: Path) -> None:
     for side in ("left", "bottom"):
         ax.spines[side].set_color("#898781")
     ax.tick_params(colors="#52514e")
-    ax.legend(title="mode", fontsize=8, title_fontsize=8, frameon=False, ncol=4, loc="upper center")
+    ax.legend(title="mode", fontsize=8, title_fontsize=8, frameon=False, ncol=3, loc="upper center")
     fig.tight_layout()
     fig.savefig(path, dpi=300, facecolor="#fcfcfb")
     plt.close(fig)
 
 
 def plot_confusions(results: dict, path: Path) -> None:
-    modes = normalize.MODES
-    fig, axes = plt.subplots(len(CLASSIFIERS), len(modes), figsize=(11, 8.2))
+    modes = RUN_MODES
+    fig, axes = plt.subplots(len(CLASSIFIERS), len(modes), figsize=(13.5, 8.2))
     short = ["neg", "neu", "pos"]
     for r, clf in enumerate(CLASSIFIERS):
         for c, mode in enumerate(modes):
@@ -208,7 +214,7 @@ def plot_confusions(results: dict, path: Path) -> None:
             if c == 0:
                 ax.set_ylabel(f"{CLASSIFIER_NAMES[clf]}\ntrue", fontsize=8)
             if r == 0:
-                ax.set_title(mode, fontsize=9)
+                ax.set_title(f"{mode} (ablation)" if mode in normalize.ABLATION_MODES else mode, fontsize=9)
     fig.suptitle("E2: test confusion matrices (rows = true class, columns = predicted)", fontsize=10)
     fig.tight_layout()
     fig.savefig(path, dpi=300, facecolor="#fcfcfb")
@@ -227,7 +233,7 @@ def main() -> None:
     normalize.fit_variants(texts["train"])     # clusters learned from train only
 
     results = {}
-    for mode in normalize.MODES:
+    for mode in RUN_MODES:
         print(f"running mode {mode} ...", flush=True)
         results[mode] = run_mode(mode, texts, labels)
 
@@ -236,10 +242,10 @@ def main() -> None:
     resamples = rng.integers(0, len(labels["test"]), size=(N_BOOTSTRAP, len(labels["test"])))
     for clf in CLASSIFIERS:
         base = results["raw"][clf]["_test_pred"]
-        for mode in normalize.MODES[1:]:
+        for mode in RUN_MODES[1:]:
             results[mode][clf]["test_vs_raw_bootstrap"] = paired_bootstrap(
                 labels["test"], base, results[mode][clf]["_test_pred"], resamples)
-    for mode in normalize.MODES:
+    for mode in RUN_MODES:
         for clf in CLASSIFIERS:
             del results[mode][clf]["_test_pred"]
 
@@ -259,6 +265,10 @@ def main() -> None:
             "dataset": "SentiMix Hinglish (SemEval-2020 Task 9), official splits",
             "split_sizes": {s: len(rows) for s, rows in splits.items()},
             "modes": list(normalize.MODES),
+            "ablation_modes": list(normalize.ABLATION_MODES),
+            "ablation_note": "hkey_vdrop = H-Key with V-drop; agreed after the settings were frozen, "
+                             "reported as an ablation, never used to choose settings. "
+                             "p-values are not corrected for multiple comparisons",
             "classifiers": list(CLASSIFIERS),
             "features": {"nb": "term counts of normalised tokens (multinomial)",
                          "rocchio": "ltc tf-idf, cosine-normalised; nearest centroid by Euclidean distance",
@@ -294,14 +304,14 @@ def main() -> None:
 
     print(f"\n{'classifier':10s} {'mode':14s} {'k':>3s} {'dev mF1':>8s} {'test mF1':>9s} {'test wF1':>9s} {'test acc':>9s}")
     for clf in CLASSIFIERS:
-        for mode in normalize.MODES:
+        for mode in RUN_MODES:
             e = results[mode][clf]
             print(f"{clf:10s} {mode:14s} {str(e.get('k', '-')):>3s} {100*e['dev']['macro']['f1']:8.2f} "
                   f"{100*e['test']['macro']['f1']:9.2f} {100*e['test']['weighted']['f1']:9.2f} "
                   f"{100*e['test']['accuracy']:9.2f}")
     print("\npaired bootstrap vs raw (test macro F1):")
     for clf in CLASSIFIERS:
-        for mode in normalize.MODES[1:]:
+        for mode in RUN_MODES[1:]:
             b = results[mode][clf]["test_vs_raw_bootstrap"]
             print(f"  {clf:8s} {mode:14s} delta {100*b['delta_macro_f1']:+5.2f}  "
                   f"95% CI [{100*b['ci95'][0]:+5.2f}, {100*b['ci95'][1]:+5.2f}]  p {b['p_one_sided']:.3f}")
