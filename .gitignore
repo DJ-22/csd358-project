@@ -223,3 +223,7 @@ __marimo__/
 data/raw/*
 !data/raw/.gitkeep
 demo/*.mp4
+
+# Demo artifacts (rebuilt by: python -m hinglishkey.index)
+artifacts/*.pkl
+artifacts/*.json
