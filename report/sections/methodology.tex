@@ -216,7 +216,12 @@ own label distribution.
 $1/r$ for the target at rank $r$ (0 if it is not retrieved); its mean over queries is the MRR.
 P@1 is the fraction of queries whose target is ranked first, and R@$k$ the fraction with the target
 in the top $k$. MAP is also reported: with a single relevant document the average precision of a
-query equals its reciprocal rank, so MAP equals MRR here.
+query equals its reciprocal rank, so MAP equals MRR here. Differences in MRR are tested with a
+paired bootstrap over the queries, as for E2: 1{,}000 resamples of the 100 queries with replacement
+(seed 42, the same resamples for every comparison), reporting the 95\% percentile interval of the
+difference and its $p$-value. Each normalised index is compared with the raw index (one-sided), and
+three pairs of normalised indexes with each other (two-sided); all seven comparisons were fixed
+before the test was computed, and the $p$-values are not corrected for multiple comparisons.
 
 \subsection{Gold data}
 \label{sec:gold}
