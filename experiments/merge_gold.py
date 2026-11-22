@@ -34,7 +34,7 @@ LABEL_ONLY_COLUMNS = ["group_id", "headword", "candidate", "label", "note"]
 
 
 def cohen_kappa(a: list[str], b: list[str]) -> float:
-    """Cohen's kappa = (P(A) - P(E)) / (1 - P(E))   (L6, IIR section 8.1).
+    """Cohen's kappa = (P(A) - P(E)) / (1 - P(E))   (L6, IIR section 8.5).
 
     P(A) = observed agreement = fraction of items with the same label.
     P(E) = chance agreement = sum over labels k of p_a(k) * p_b(k), where

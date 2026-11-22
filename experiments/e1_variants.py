@@ -472,11 +472,37 @@ def main():
     r.add_argument("--gold", type=Path, default=GOLD_TSV)
     r.add_argument("--results", type=Path, default=RESULTS_JSON)
     r.add_argument("--figure", type=Path, default=THETA_FIG)
+    gs = sub.add_parser("gold-stats", help="describe the gold file only (no system is scored)")
+    gs.add_argument("--gold", type=Path, default=GOLD_TSV)
+    gs.add_argument("--out", type=Path, default=ROOT / "results" / "e1_gold_stats.json")
     pl = sub.add_parser("plot", help="redraw figures/e1_theta.png from results/e1_variants.json (no rescoring)")
     pl.add_argument("--results", type=Path, default=RESULTS_JSON)
     pl.add_argument("--figure", type=Path, default=THETA_FIG)
     args = ap.parse_args()
 
+    if args.cmd == "gold-stats":
+        groups = load_gold(args.gold)
+        rows = [r for rs in groups.values() for r in rs]
+        disputed = [r for r in rows if r["label_a"] != r["label_b"]]
+        sizes = Counter(len(rs) for rs in groups.values())
+        stats = {
+            "file": args.gold.resolve().relative_to(ROOT).as_posix(),
+            "n_groups": len(groups), "n_rows": len(rows),
+            "candidates_per_group": {str(k): v for k, v in sorted(sizes.items())},
+            "labels": dict(Counter(r["label"] for r in rows)),
+            "labels_annotator_a": dict(Counter(r["label_a"] for r in rows)),
+            "labels_annotator_b": dict(Counter(r["label_b"] for r in rows)),
+            "n_disputed": len(disputed),
+            "adjudicated_as_a": sum(r["label"] == r["label_a"] for r in disputed),
+            "adjudicated_as_b": sum(r["label"] == r["label_b"] for r in disputed),
+            "adjudicated_as_neither": sum(r["label"] not in (r["label_a"], r["label_b"]) for r in disputed),
+            "groups_with_a_same_candidate": sum(any(r["label"] == "SAME" for r in rs) for rs in groups.values()),
+        }
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        with open(args.out, "w", encoding="utf-8") as f:
+            json.dump(stats, f, indent=2)
+        print(json.dumps(stats, indent=2))
+        return
     if args.cmd == "plot":
         with open(args.results, encoding="utf-8") as f:
             tune = json.load(f)["tuning_on_dev"]

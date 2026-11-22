@@ -28,7 +28,7 @@ def test_log_tf_and_idf():
 
 
 def test_lnc_ltc_textbook_example():
-    # IIR Example 6.4: query "best car insurance", document "car insurance
+    # IIR Section 6.4.3 worked example: query "best car insurance", document "car insurance
     # auto insurance", N = 1,000,000; df auto 5000, best 50000, car 10000,
     # insurance 1000. The book's score is 0.8.
     df = {"auto": 5000, "best": 50000, "car": 10000, "insurance": 1000}

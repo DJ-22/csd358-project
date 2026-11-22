@@ -1,0 +1,100 @@
+% Proposed model. Numbers in this file come from results/e1_variants.json (settings chosen on dev)
+% and results/e4_efficiency.json (vocabulary sizes).
+% Needs in the preamble: tikz with \usetikzlibrary{arrows.meta,positioning}, booktabs.
+
+\section{Proposed Model}
+\label{sec:model}
+
+HinglishKey replaces every word of a tweet by the name of its \emph{equivalence class}
+\citep[Section~2.2]{manning2008iir}: a term shared by all spellings that should count as the same
+word. The same terms are used twice, as index terms for retrieval and as features for
+classification, so one normalisation step serves both tasks (Figure~\ref{fig:pipeline}). No
+lexicon, transliteration table or language identifier is used; everything except a short list of
+letter rules is learned from the training tweets.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  node distance=5mm and 6mm,
+  box/.style={draw, rounded corners=2pt, align=center, font=\footnotesize,
+              minimum height=8mm, inner sep=3pt, text width=24mm},
+  learn/.style={box, dashed},
+  use/.style={box, fill=black!6},
+  arrow/.style={-{Stealth[length=2mm]}, semithick}]
+  \node[box] (tweet) {Raw tweet\\\texttt{Bohot acha laga!!}};
+  \node[box, right=of tweet] (tok) {Tokenise\\\scriptsize lowercase, strip URLs/@, squash};
+  \node[box, right=of tok] (hkey) {H-Key\\\scriptsize letter rules, vowel policy};
+  \node[box, right=of hkey] (cls) {Variant class\\\scriptsize canonical spelling};
+  \node[learn, below=of hkey] (fit) {Learn classes from train\\\scriptsize blocking + trigram cosine $\geq\theta$};
+  \node[use, below=12mm of cls, xshift=-14mm] (index) {Positional inverted index\\\scriptsize AND, phrase, lnc.ltc};
+  \node[use, right=4mm of index] (clf) {Classifiers\\\scriptsize NB, Rocchio, $k$NN};
+  \draw[arrow] (tweet) -- (tok);
+  \draw[arrow] (tok) -- (hkey);
+  \draw[arrow] (hkey) -- (cls);
+  \draw[arrow, dashed] (fit) -| (cls);
+  \draw[arrow] (cls.south) -- ++(0,-4mm) -| (index.north);
+  \draw[arrow] (cls.south) -- ++(0,-4mm) -| (clf.north);
+\end{tikzpicture}
+\caption{The HinglishKey pipeline. Each word becomes the term of its equivalence class; the
+classes are learned from the training tweets only (dashed). The same terms feed the retrieval
+index (E3, E4) and the classifiers (E2). The four normalisation modes stop at different points:
+\texttt{raw} after tokenisation, \texttt{soundex} and \texttt{hkey} after a phonetic key, and
+\texttt{hkey\_clusters} after the variant class.}
+\label{fig:pipeline}
+\end{figure}
+
+\paragraph{Tokenisation.} Tweets are lowercased and split into words. URLs and @mentions are
+removed, including the space-separated forms in which the SentiMix files store them, hashtags keep
+their text, and runs of three or more identical letters are shortened to two
+(\texttt{achhaaaa}$\to$\texttt{achhaa}).
+
+\paragraph{H-Key.} Soundex \citep[Section~3.4]{manning2008iir} maps letters to six digit classes
+designed for English surnames, and the lecture itself calls it ``not very useful'' for retrieval,
+pointing to \citet{zobel1996phonetic}. Romanised Hindi varies along different lines: aspiration is
+written or not (\texttt{thik}/\texttt{theek}), letters with the same sound are swapped
+(\texttt{wala}/\texttt{vala}, \texttt{zindagi}/\texttt{jindagi}), consonants are doubled or not
+(\texttt{accha}/\texttt{acha}), and vowels are written freely (\texttt{bahut}/\texttt{bohot}/\texttt{bht}).
+H-Key is a Soundex-shaped key with one rule per kind of variation, which keeps letters instead of
+digits and has no length limit by default. Two vowel policies are possible: \emph{V-drop} deletes
+every vowel after the first letter, as Soundex does; \emph{V-norm} only unifies long and short
+spellings of the same vowel (\texttt{ee}$\to$\texttt{i}, \texttt{oo}$\to$\texttt{u}, \ldots).
+Section~\ref{sec:methodology} gives every rule.
+
+\paragraph{Variant classes.} A phonetic key alone either merges too much (V-drop also joins
+\texttt{bas}/\texttt{bus}) or too little (V-norm keeps \texttt{bahut} and \texttt{bohot} apart).
+HinglishKey therefore learns classes from the training corpus: two words are merged only if they
+share an H-Key \emph{and} their character-trigram vectors are similar,
+\begin{equation}
+\mathrm{key}(a)=\mathrm{key}(b)\ \wedge\ \cos(\vec a_{3g},\vec b_{3g})\ge\theta,
+\label{eq:merge}
+\end{equation}
+and each class is named after its most frequent member. The key acts as a blocking step, so only
+words inside one key block are ever compared.
+
+\paragraph{Modes.} Table~\ref{tab:modes} lists the normalisation modes compared in the experiments.
+All settings were chosen on the E1 development groups before any other experiment was run.
+
+\begin{table}[t]
+\centering
+\caption{Normalisation modes. Vocabulary: distinct terms over all 20{,}000 SentiMix tweets (E4).}
+\label{tab:modes}
+\small
+\begin{tabular}{@{}llr@{}}
+\toprule
+Mode & Term of a word & Vocabulary \\
+\midrule
+\texttt{raw} & the token itself & 37{,}485 \\
+\texttt{soundex} & lecture Soundex code (baseline) & 4{,}756 \\
+\texttt{hkey} & H-Key, V-norm (main) & 30{,}863 \\
+\texttt{hkey\_clusters} & variant class: V-drop key, $\theta=0.85$ & 30{,}852 \\
+\texttt{hkey\_vdrop} & H-Key, V-drop (ablation) & 15{,}709 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Uses.} For retrieval, the terms are indexed in a positional inverted index that supports
+Boolean AND, phrase queries and ranked lnc.ltc retrieval; a query is normalised with the same mode,
+so a query written \texttt{bahut accha} can find a tweet written \texttt{bohot acha}. For
+classification, the terms replace the words as features of multinomial Naive Bayes, Rocchio and
+$k$NN. A web demo (Search, Phrase search, Variant explorer, Sentiment, Results) runs on precomputed
+indexes on a laptop CPU.

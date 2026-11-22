@@ -1,0 +1,33 @@
+{
+  "file": "data/gold/variants_gold.tsv",
+  "n_groups": 600,
+  "n_rows": 3541,
+  "candidates_per_group": {
+    "1": 3,
+    "2": 6,
+    "3": 4,
+    "4": 1,
+    "5": 6,
+    "6": 580
+  },
+  "labels": {
+    "SAME": 776,
+    "INFLECTION": 382,
+    "DIFFERENT": 2383
+  },
+  "labels_annotator_a": {
+    "SAME": 789,
+    "INFLECTION": 393,
+    "DIFFERENT": 2359
+  },
+  "labels_annotator_b": {
+    "SAME": 773,
+    "INFLECTION": 381,
+    "DIFFERENT": 2387
+  },
+  "n_disputed": 69,
+  "adjudicated_as_a": 12,
+  "adjudicated_as_b": 57,
+  "adjudicated_as_neither": 0,
+  "groups_with_a_same_candidate": 383
+}

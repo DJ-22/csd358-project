@@ -1,0 +1,265 @@
+% Methodology. Algorithms and formulas follow the course lectures (notation of Manning et al. 2008).
+% Gold-set numbers come from results/e1_gold_stats.json and results/e1_agreement.json;
+% E3 query numbers from results/e3_retrieval.json; settings from results/e1_variants.json.
+% Needs in the preamble: amsmath, booktabs, algorithm, algpseudocode.
+
+\section{Methodology}
+\label{sec:methodology}
+
+Every algorithm below is implemented from scratch in Python; library code is used only for file
+input/output, plotting, and for cross-checks in the test suite.
+
+\subsection{Tokenisation}
+\label{sec:tokenisation}
+
+Each tweet is lowercased (case folding). URLs and @mentions are removed, including the forms in
+which the SentiMix files store them with spaces between the pieces (\texttt{https // t co / ID},
+\texttt{@ name \_ part}). The text is then split into words, where a word starts with a letter or
+digit in any script and continues with letters, digits and combining marks, so Devanagari vowel
+signs stay inside their word; emojis and punctuation separate words and hashtags keep their text.
+Finally every run of three or more identical letters is shortened to two. No language
+identification is done: English words are kept as they are.
+
+\subsection{Soundex baseline}
+
+Lecture Soundex \citep[Section~3.4]{manning2008iir} (1) keeps the first letter; (2) changes
+A, E, I, O, U, H, W, Y to 0; (3) maps B, F, P, V$\to$1; C, G, J, K, Q, S, X, Z$\to$2; D, T$\to$3;
+L$\to$4; M, N$\to$5; R$\to$6; (4) repeatedly removes one of each pair of identical consecutive
+digits; and (5) removes all zeros, pads with trailing zeros and keeps four positions. For example
+\textsc{herman}$\to$\textsc{h}06505$\to$H655 and \textsc{hermann}$\to$H655. We follow the lecture
+literally: the first letter is not itself coded, so \textsc{pfister} gives P123.
+
+\subsection{H-Key}
+\label{sec:hkey}
+
+H-Key applies the rules of Table~\ref{tab:hkey} in order to every word made only of the letters
+a--z; other tokens (numbers, Devanagari) are left unchanged. Every rule can be switched off for
+ablations.
+
+\begin{table}[t]
+\centering
+\caption{H-Key rules, in the order they are applied, with spelling pairs from the SentiMix training
+tweets that each rule joins.}
+\label{tab:hkey}
+\small
+\begin{tabular}{@{}p{0.19\linewidth}p{0.47\linewidth}p{0.26\linewidth}@{}}
+\toprule
+Rule & Action & Joins \\
+\midrule
+Lone \textit{c} & \textit{c}$\to$\textit{k} when not followed by \textit{h} or \textit{ch}
+  (runs first, so \textit{ch} never becomes \textit{k}) & congress/kongress \\
+De-aspirate & kh$\to$k, gh$\to$g, ch$\to$c, jh$\to$j, th$\to$t, dh$\to$d, ph$\to$f, bh$\to$b,
+  sh$\to$s, repeated until none is left & thik/tik, phir/fir, achha/acha \\
+Merge letters & w$\to$v, z$\to$j, q$\to$k, x$\to$ks & wala/vala, zindagi/jindagi, thanx/thanks \\
+Squash & runs of the same consonant become one & pakka/paka, kutta/kuta \\
+Vowels: V-drop & delete every vowel except a first letter & bahut/bohot/bahot \\
+Vowels: V-norm & aa$\to$a; ee, ii$\to$i; oo, uu$\to$u; ai, ae$\to$e; au, ou$\to$o & pyaar/pyar,
+  theek/thik, aur/our \\
+Length cap & optional; keep the first $n$ letters (off by default) & doston/dosto ($n=3$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two choices keep the rules from destroying distinctions. The lone-\textit{c} rule runs before
+de-aspiration, so \textit{ch} (\textit{chal}, ``walk'') stays apart from \textit{k}
+(\textit{kal}, ``tomorrow''). Squashing touches only consonants, because V-norm must still see the
+doubled vowels \textit{ee} and \textit{oo}. For example, \textit{achha} becomes \textit{aca} after
+de-aspiration, so its V-drop key is \texttt{ac} and its V-norm key is \texttt{aca}; \textit{theek}
+gets the V-drop key \texttt{tk} and the V-norm key \texttt{tik}.
+
+\subsection{Learning variant classes}
+\label{sec:variants}
+
+Classes are learned from the word types of the training split only.
+
+\paragraph{Blocking.} Words are grouped by their H-Key. Comparing every pair of the $V$ word types
+would cost $O(V^2)$ comparisons; only pairs inside one key block are compared.
+
+\paragraph{Similarity.} Each word is represented by the character trigrams of its
+\emph{similarity form}, its H-Key under V-norm without a length cap, padded with \$ at both ends
+(\texttt{\$fi}, \texttt{fir}, \texttt{ir\$} for \textit{phir}). Trigrams are weighted by tf-idf as
+in L3, treating every word type as a document:
+\begin{equation}
+w_{g,a}=\bigl(1+\log_{10}\mathrm{tf}_{g,a}\bigr)\cdot\log_{10}\frac{N}{\mathrm{df}_g},
+\qquad
+\cos(\vec a,\vec b)=\frac{\vec a\cdot\vec b}{|\vec a|\,|\vec b|},
+\end{equation}
+where $N$ is the number of training word types and $\mathrm{df}_g$ the number containing trigram
+$g$. Using the similarity form instead of the raw spelling lets the cosine see what the key already
+knows: \textit{phir} and \textit{fir} share only one raw trigram but have identical forms.
+
+\paragraph{Merging.} Two words of one block are merged when Equation~\ref{eq:merge} holds; merges
+are closed transitively with a union--find structure (single-link), so every word ends up in exactly
+one class. The class is named after its most frequent member. A word not seen in training joins the
+class of its most similar same-key training word if that cosine reaches $\theta$, and otherwise
+forms its own class.
+
+\begin{algorithm}[t]
+\caption{Learning variant classes from the training word types}
+\label{alg:variants}
+\begin{algorithmic}[1]
+\Require word types $W$ with frequencies, key function $\mathrm{key}$, threshold $\theta$
+\State compute the unit tf-idf trigram vector $\vec v_w$ of the similarity form of each $w\in W$
+\State $\mathit{blocks}\gets$ group $W$ by $\mathrm{key}(w)$
+\State make a union--find set for every $w\in W$
+\For{each block $B$}
+  \For{each pair $a,b\in B$}
+    \If{$\vec v_a\cdot\vec v_b\ge\theta$} \textsc{Union}$(a,b)$ \EndIf
+  \EndFor
+\EndFor
+\For{each set $S$} name every member of $S$ by $\arg\max_{w\in S}\mathrm{freq}(w)$ \EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Settings.} The vowel policy of the key and $\theta$ were chosen on the E1 development
+groups (Section~\ref{sec:e1}): a V-drop key with $\theta=0.85$. With a V-norm key the threshold has no
+effect, because every word of a block then has the same similarity form and every cosine is 1;
+clustering on a V-norm key is therefore identical to plain V-norm H-Key.
+
+\paragraph{$k$-means ablation.} As an alternative to the threshold rule, every block with at least
+10 words is split by $k$-means \citep[Chapter~16]{manning2008iir} over the same vectors: $K$ seeds
+are drawn at random (seed 42, best of 5 runs), and assignment to the nearest centroid alternates with
+recomputing the centroids until no assignment changes. The residual sum of squares
+$\mathrm{RSS}=\sum_{k}\sum_{\vec x\in\omega_k}|\vec x-\vec\mu(\omega_k)|^2$ is computed for
+$K=1,\ldots,\lfloor|B|/2\rfloor$, and $K$ is taken at the knee of the RSS curve: the point furthest
+below the straight line joining its first and last points (both axes scaled to $[0,1]$). Smaller
+blocks keep the threshold rule.
+
+\subsection{Positional inverted index}
+\label{sec:index}
+
+For every term $t$ the index stores a postings list of $(d, \langle p_1,p_2,\ldots\rangle)$ pairs,
+the documents containing $t$ in increasing order, each with the sorted positions of $t$. Queries
+are tokenised and normalised exactly like documents.
+
+\paragraph{Boolean AND.} Two postings lists are intersected by advancing two pointers in step,
+which costs $O(x+y)$ for lists of lengths $x$ and $y$ \citep[Figure~1.6]{manning2008iir}. For a
+conjunction of several terms the terms are processed in increasing order of document frequency, so
+every intermediate result is at most as long as the shortest list, and the merge stops as soon as
+the result is empty.
+
+\paragraph{Phrase queries.} A phrase $t_1t_2\ldots t_m$ is answered by positional intersection
+\citep[Figure~2.12]{manning2008iir}. Starting from the postings of $t_1$, the postings of $t_i$ are
+merged in, keeping in each shared document only the start positions $s$ for which $t_i$ occurs at
+$s+i-1$ (Algorithm~\ref{alg:posint}). Because the terms are equivalence classes, the phrase
+\textit{bahut accha} also matches \textit{bohot acha} whenever the mode puts these spellings in the
+same classes.
+
+\begin{algorithm}[t]
+\caption{Positional intersection with an offset}
+\label{alg:posint}
+\begin{algorithmic}[1]
+\Require postings $p_1,p_2$ of $(d,\text{positions})$ sorted by $d$; offset $o$
+\State $\mathit{answer}\gets\langle\rangle$
+\While{$p_1\neq\mathrm{nil}$ \textbf{and} $p_2\neq\mathrm{nil}$}
+  \If{$\mathrm{doc}(p_1)=\mathrm{doc}(p_2)$}
+    \State $\mathit{kept}\gets\{s\in\mathrm{pos}(p_1) : s+o\in\mathrm{pos}(p_2)\}$
+      \Comment{two-pointer merge of the position lists}
+    \If{$\mathit{kept}\neq\emptyset$} append $(\mathrm{doc}(p_1),\mathit{kept})$ to $\mathit{answer}$ \EndIf
+    \State advance $p_1$ and $p_2$
+  \ElsIf{$\mathrm{doc}(p_1)<\mathrm{doc}(p_2)$} advance $p_1$
+  \Else\ advance $p_2$
+  \EndIf
+\EndWhile
+\State \Return $\mathit{answer}$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Ranked retrieval}
+\label{sec:ranking}
+
+Documents are ranked by cosine similarity with SMART lnc.ltc weighting
+\citep[Section~6.4.3]{manning2008iir}. A document term gets
+$w_{t,d}=(1+\log_{10}\mathrm{tf}_{t,d})$ and the document vector is length-normalised (lnc, no
+idf); a query term gets $w_{t,q}=(1+\log_{10}\mathrm{tf}_{t,q})\cdot\log_{10}(N/\mathrm{df}_t)$ and
+the query vector is length-normalised (ltc). The score is
+\begin{equation}
+\cos(\vec q,\vec d)=\frac{\vec q\cdot\vec d}{|\vec q|\,|\vec d|}
+=\sum_{t\in q}\frac{w_{t,q}}{|\vec q|}\cdot\frac{w_{t,d}}{|\vec d|},
+\end{equation}
+accumulated term-at-a-time over the postings of the query terms, with the document lengths
+$|\vec d|$ computed once when the index is loaded. The $K$ best of the $J$ documents with a non-zero
+score are taken from a binary max-heap: building the heap bottom-up costs at most $2J$ comparisons
+and each of the $K$ removals about $2\log J$, so $2J+2K\log J$ in total, which is less than sorting
+all $J$ scores when $K\ll J$. Ties go to the earlier document. The implementation reproduces the
+lnc.ltc worked example of \citet[Section~6.4.3]{manning2008iir} (score 0.8).
+
+\subsection{Classifiers}
+\label{sec:classifiers}
+
+The normalised terms are the features of three classifiers (lectures L12--L13). Multinomial Naive
+Bayes assigns
+\begin{equation}
+c_{\mathrm{map}}=\arg\max_{c}\Bigl[\log\hat P(c)+\sum_{1\le k\le n_d}\log\hat P(t_k\mid c)\Bigr],
+\qquad
+\hat P(t\mid c)=\frac{T_{ct}+1}{\sum_{t'}T_{ct'}+B},
+\end{equation}
+with add-one smoothing over the vocabulary size $B$, computed in log space. Rocchio represents each
+class by its centroid $\vec\mu(c)=\frac{1}{|D_c|}\sum_{d\in D_c}\vec v(d)$ of tf-idf vectors and
+assigns a document to the nearest centroid. $k$NN assigns the majority class among the $k$ training
+documents with the highest cosine similarity. Section~\ref{sec:e2} gives the training protocol.
+
+\subsection{Evaluation measures}
+\label{sec:measures}
+
+\paragraph{Variant grouping (E1).} A system's grouping is compared with the gold grouping by
+counting \emph{pairs} of words placed in the same group. With $\mathit{TP}$ the pairs grouped by
+both, precision $P=\mathit{TP}/|\text{system pairs}|$, recall $R=\mathit{TP}/|\text{gold pairs}|$ and
+$F_1=\frac{2PR}{P+R}$; only words that occur in the gold set are scored.
+
+\paragraph{Agreement.} Agreement between the two annotations is measured with Cohen's $\kappa$
+\citep[Section~8.5]{manning2008iir}, $\kappa=\frac{P(A)-P(E)}{1-P(E)}$, where $P(A)$ is the observed
+agreement and $P(E)=\sum_k p_A(k)\,p_B(k)$ is the agreement expected by chance from each annotator's
+own label distribution.
+
+\paragraph{Retrieval (E3).} For each query exactly one tweet is relevant. The reciprocal rank is
+$1/r$ for the target at rank $r$ (0 if it is not retrieved); its mean over queries is the MRR.
+P@1 is the fraction of queries whose target is ranked first, and R@$k$ the fraction with the target
+in the top $k$. MAP is also reported: with a single relevant document the average precision of a
+query equals its reciprocal rank, so MAP equals MRR here.
+
+\subsection{Gold data}
+\label{sec:gold}
+
+\paragraph{Variant gold set (E1).} Candidate groups were drawn from the training vocabulary: 600
+headwords sampled with seed 42 from three frequency bands, with 150 words tagged Hindi and 50 tagged
+English (by the SentiMix word-level tags, used only for this sampling) in each band. Each headword
+received up to six candidate spellings from four sources: edit distance at most 2, lecture Soundex,
+H-Key with V-drop, and the V-norm similarity form. Two sources are independent of H-Key, so the gold
+set does not contain only words that H-Key already groups, and the candidate file does not show
+which source proposed a candidate. No word appears in two groups. Every candidate was labelled
+against its headword as \textsc{same} (the same word spelled differently), \textsc{inflection} (the
+same dictionary word in another grammatical form) or \textsc{different}, following a written guide.
+Strict scores count only \textsc{same} pairs as true variants; lenient scores also count
+\textsc{inflection}.
+
+Both annotations were produced by language models, in separate sessions that saw only the labelling
+guide and the candidate rows, with no access to the code, H-Key, any other system output or the
+other annotation. Cohen's $\kappa$ between them is 0.960 over the three labels (observed agreement
+0.981; 0.962 for strict and for lenient binary labels). This is \emph{agreement between two
+independent model annotations, not human inter-annotator agreement}; since similar models are likely
+to make correlated errors, it probably overstates how reliable the gold set is. The 69 disagreements
+were adjudicated by a third language-model session that saw both labels in random order without
+annotator identity; it sided with the second annotation 57 times and with the first 12 times. No
+gold label was assigned by a human; one author reviewed 100 randomly chosen rows of the final gold
+set and found no label to change. The final set has 3{,}541 labelled pairs in 600 groups:
+776 \textsc{same}, 382 \textsc{inflection} and 2{,}383 \textsc{different}.
+
+\paragraph{Retrieval queries (E3).} The 100 queries target 100 test tweets selected with seed 42
+(rules in the data documentation). Each query has 3--6 words of its tweet, at least two of them Hindi
+words respelled in a common alternative spelling. The queries were machine-generated by a language
+model following these written rules, without access to H-Key or the index, and then reviewed and
+edited by the authors; the file was frozen before the first retrieval run.
+
+\subsection{Protocol}
+\label{sec:protocol}
+
+The variant classes and all classifier parameters are learned from the official training split
+only. Every setting is chosen on development data, and test data is scored once with the chosen
+settings. For E1 the 600 gold groups are split into 300 development and 300 test groups (seed 42);
+the vowel policy of \texttt{hkey} and the vowel policy and $\theta\in\{0.20,0.25,\ldots,0.90\}$ of
+\texttt{hkey\_clusters} are chosen by strict $F_1$ on the development groups. The decision to
+report H-Key with V-drop as an extra ablation in E3 was taken before E3 was first run, and V-norm
+stays the main H-Key mode regardless of the E3 scores. Every experiment is one command
+(\texttt{experiments/e1\_variants.py}, \texttt{e3\_retrieval.py}, \texttt{e4\_efficiency.py}) and
+records its configuration and results in a JSON file.
