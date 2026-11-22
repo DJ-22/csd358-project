@@ -1,0 +1,97 @@
+{
+  "method": "paired bootstrap over 100 queries, 1000 resamples with replacement, numpy default_rng(42), same resamples for every comparison; statistic = MRR(a) - MRR(b)",
+  "n_queries": 100,
+  "n_resamples": 1000,
+  "seed": 42,
+  "ci_percent": 95,
+  "p_resolution": 0.001,
+  "multiple_comparisons": {
+    "uncorrected": true,
+    "n_tests": 7,
+    "bonferroni_alpha_all": 0.0071428571428571435,
+    "bonferroni_alpha_vs_raw": 0.0125
+  },
+  "pre_registered": "comparisons fixed before computing (see project notes)",
+  "vs_raw": [
+    {
+      "a": "soundex",
+      "b": "raw",
+      "delta_mrr": 0.27167061254040514,
+      "ci95": [
+        0.1841494923261036,
+        0.36735635896660385
+      ],
+      "p": 0.0,
+      "sided": "one (H1: a > b)"
+    },
+    {
+      "a": "hkey",
+      "b": "raw",
+      "delta_mrr": 0.29227964208482954,
+      "ci95": [
+        0.21568809056159288,
+        0.3701432439056522
+      ],
+      "p": 0.0,
+      "sided": "one (H1: a > b)"
+    },
+    {
+      "a": "hkey_clusters",
+      "b": "raw",
+      "delta_mrr": 0.26096704624956013,
+      "ci95": [
+        0.18501564274317003,
+        0.3370144442515668
+      ],
+      "p": 0.0,
+      "sided": "one (H1: a > b)"
+    },
+    {
+      "a": "hkey_vdrop",
+      "b": "raw",
+      "delta_mrr": 0.31954622674770783,
+      "ci95": [
+        0.23959563196362027,
+        0.39932271765922484
+      ],
+      "p": 0.0,
+      "sided": "one (H1: a > b)"
+    }
+  ],
+  "pairs": [
+    {
+      "a": "hkey",
+      "b": "soundex",
+      "delta_mrr": 0.02060902954442434,
+      "ci95": [
+        -0.06697252804973489,
+        0.09266513507289356
+      ],
+      "p": 0.574,
+      "sided": "two"
+    },
+    {
+      "a": "hkey_vdrop",
+      "b": "hkey",
+      "delta_mrr": 0.027266584662878363,
+      "ci95": [
+        -0.027059033358739062,
+        0.08282973059110861
+      ],
+      "p": 0.308,
+      "sided": "two"
+    },
+    {
+      "a": "hkey_clusters",
+      "b": "hkey",
+      "delta_mrr": -0.03131259583526934,
+      "ci95": [
+        -0.061988550842023565,
+        -0.006592081310051184
+      ],
+      "p": 0.018,
+      "sided": "two"
+    }
+  ],
+  "source": "results/e3_retrieval.json per_query ranks"
+}

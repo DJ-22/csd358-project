@@ -2,6 +2,7 @@
 %   results/e1_variants.json   (python experiments/e1_variants.py run)
 %   results/e1_gold_stats.json (python experiments/e1_variants.py gold-stats)
 %   results/e3_retrieval.json  (python experiments/e3_retrieval.py)
+%   results/e3_bootstrap.json  (python experiments/e3_retrieval.py bootstrap)
 %   results/e4_efficiency.json (python experiments/e4_efficiency.py)
 
 \subsection{E1: Grouping spelling variants}
@@ -113,9 +114,41 @@ tweet. The V-drop ablation is best on every measure (MRR 0.810, R@10 0.98), as i
 suggests: query respellings often change vowels (\textit{bahut}$\to$\textit{bohot},
 \textit{nahi}$\to$\textit{nhi}), which V-norm keeps apart. Soundex, the worst grouping in E1, is
 close behind (MRR 0.762): in known-item search an over-merged term costs little, because the other
-query terms still single out the tweet. The learned classes again add nothing over V-norm. These
-differences among the normalised indexes are small for 100 queries and were not tested for
-significance; the gap to the raw index is large for all of them.
+query terms still single out the tweet. The learned classes again add nothing over V-norm.
+
+\begin{table}[t]
+\centering
+\caption{E3 significance: paired bootstrap of the MRR difference over the 100 queries (1{,}000
+resamples, seed 42, the same resamples for every row; comparisons fixed before computing).
+$p$ is one-sided against \texttt{raw} and two-sided between normalised indexes, uncorrected for
+multiple comparisons.}
+\label{tab:e3-boot}
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Comparison & $\Delta$MRR & 95\% interval & $p$ \\
+\midrule
+Soundex $-$ raw & $+0.272$ & $[+0.184,\ +0.367]$ & $<0.001$ \\
+H-Key (V-norm) $-$ raw & $+0.292$ & $[+0.216,\ +0.370]$ & $<0.001$ \\
+H-Key + classes $-$ raw & $+0.261$ & $[+0.185,\ +0.337]$ & $<0.001$ \\
+H-Key V-drop $-$ raw & $+0.320$ & $[+0.240,\ +0.399]$ & $<0.001$ \\
+\midrule
+H-Key (V-norm) $-$ Soundex & $+0.021$ & $[-0.067,\ +0.093]$ & 0.574 \\
+H-Key V-drop $-$ H-Key (V-norm) & $+0.027$ & $[-0.027,\ +0.083]$ & 0.308 \\
+H-Key + classes $-$ H-Key (V-norm) & $-0.031$ & $[-0.062,\ -0.007]$ & 0.018 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Significance.} Table~\ref{tab:e3-boot} tests these differences with the paired bootstrap
+used for E2. Every normalised index beats the raw index: none of the 1{,}000 resamples favours
+\texttt{raw}, and every interval lies far above zero, so these gains survive any correction for the
+seven tests. Among the normalised indexes, 100 queries cannot separate H-Key from Soundex or the
+V-drop ablation from V-norm: both intervals include zero. The learned classes are slightly
+\emph{worse} than plain V-norm (interval $[-0.062,-0.007]$), but with $p=0.018$ this does not survive
+a Bonferroni correction for the seven tests (threshold $0.05/7\approx0.0071$). The safe conclusion is
+that phonetic normalisation of any of these kinds helps retrieval of respelled queries a great deal,
+while the choice among them matters little at this sample size.
 
 \subsection{E4: Efficiency}
 \label{sec:e4}
